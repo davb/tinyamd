@@ -24,6 +24,11 @@ The return value of the factory function is used as the module.
 No `module.exports`,
 no `require('dependency')` calls inside the factory function body.
 
+## A word of warning
+
+**This is work in progress!** I haven't even tested it.
+It might well blow up your web server. Handle with care.
+
 ## Download
 
   * Development: `tinyamd-X.X.X.js`
