@@ -803,3 +803,401 @@
   };
 
 }).call(this);
+
+(function() {
+  var baseUrl, config, _defined, _defining, _each, _load_module, _loaded, _loading, _map, _normalize, _on_defined, _parallel, _ref, _require, _waiting,
+    __slice = [].slice;
+
+  config = {};
+
+  baseUrl = (_ref = window.tinyamd_config) != null ? _ref : '';
+
+  if (baseUrl.charAt(baseUrl.length - 1) !== '/') {
+    baseUrl += '/';
+  }
+
+  _defined = {};
+
+  _waiting = {};
+
+  _defining = {};
+
+  _each = [].forEach != null ? function(a, c, b) {
+    return a.forEach(c, b);
+  } : function(a, c, b) {
+    _map(a, c, b);
+    return null;
+  };
+
+  _map = [].map != null ? function(a, c, b) {
+    return a.map(c, b);
+  } : function(a, c, b) {
+    var i, results, x, _i, _len;
+
+    results = [];
+    for (i = _i = 0, _len = a.length; _i < _len; i = ++_i) {
+      x = a[i];
+      results.push(c.call(b || this, x, i));
+    }
+    return results;
+  };
+
+  _parallel = function(tasks, callback) {
+    var results, succeeded;
+
+    succeeded = 0;
+    results = [];
+    if (tasks.length === 0) {
+      return callback(void 0, results);
+    }
+    return _each(tasks, function(task, i) {
+      return task.call(this, function(err, result) {
+        if (err != null) {
+          succeeded = -1;
+          return callback(err);
+        }
+        results[i] = result;
+        if ((succeeded += 1) === tasks.length) {
+          return callback(void 0, results);
+        }
+      });
+    });
+  };
+
+  _normalize = function(name, base) {
+    var i, p, parts;
+
+    parts = name.split('/');
+    if (parts[0].indexOf('.') === 0) {
+      if (base != null) {
+        parts = (p = base.split('/')).slice(0, p.length - 1).concat(parts);
+      }
+      name = [];
+      i = parts.length - 1;
+      while (i >= 0) {
+        if (parts[i] === '..') {
+          i -= 1;
+        } else {
+          if (parts[i] !== '.') {
+            name.unshift(parts[i]);
+          }
+        }
+        i -= 1;
+      }
+      name = name.join('/');
+    }
+    return name;
+  };
+
+  _loading = {};
+
+  _loaded = {};
+
+  _on_defined = {};
+
+  _load_module = function(nid, callback) {
+    if (_loading[nid]) {
+      _on_defined[nid].push(callback);
+    } else {
+      _loading[nid] = true;
+      _on_defined[nid] = [callback];
+      return head.js("" + baseUrl + nid + ".js", function() {
+        _loaded[nid] = true;
+        return window.setTimeout((function() {
+          return _require([nid], function(module) {
+            return _each(_on_defined[nid], function(callback) {
+              return callback(module);
+            });
+          });
+        }), 10);
+      });
+    }
+  };
+
+  _require = function(__id_or_ids, callback) {
+    var args, id, ids, module_dep_names, module_factory, module_factory_args, module_name, tasks;
+
+    if (callback != null) {
+      ids = __id_or_ids;
+      tasks = _map(ids, function(id) {
+        return function(task_callback) {
+          var args, module_dep_nids, module_factory, module_name;
+
+          if (_defined[id]) {
+            return task_callback(void 0, _defined[id]);
+          } else if ((args = _waiting[id])) {
+            delete _waiting[id];
+            module_name = args[0];
+            module_dep_nids = _map(args[1] || [], function(did) {
+              return _normalize(did, id);
+            });
+            module_factory = args[2];
+            return _require(module_dep_nids, function() {
+              var module_dependencies;
+
+              module_dependencies = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+              _defined[id] = module_factory.apply(this, module_dependencies);
+              return task_callback(void 0, _defined[id]);
+            });
+          } else {
+            if (_loaded[id]) {
+              return task_callback("unable to load module " + id + " remotely");
+            } else {
+              return _load_module(id, function(module) {
+                return task_callback(void 0, module);
+              });
+            }
+          }
+        };
+      });
+      return _parallel(tasks, function(err, modules) {
+        if (err != null) {
+          throw new Error(err);
+        }
+        return callback.apply(this, modules);
+      });
+    } else {
+      id = __id_or_ids;
+      if (id === 'require') {
+        return _require;
+      }
+      if (!_defined[id] && (args = _waiting[id])) {
+        delete _waiting[id];
+        module_name = args[0];
+        module_dep_names = args[1] || [];
+        module_factory = args[2];
+        module_factory_args = _map(module_dep_names, function(dep_name) {
+          return _require(_normalize(dep_name, module_name));
+        });
+        _defined[id] = module_factory.apply(this, module_factory_args);
+      }
+      return _defined[id];
+    }
+  };
+
+  window.require = function(id_or_ids, callback) {
+    if (typeof id_or_ids === 'string') {
+      return _require(id_or_ids) || (function() {
+        throw new Error("missing module " + id_or_ids);
+      })();
+    } else if (id_or_ids.splice) {
+      if (typeof callback !== 'function') {
+        throw new Error("missing callback");
+      }
+      _require(id_or_ids, callback);
+      return require;
+    }
+  };
+
+  window.define = function(name, deps, factory) {
+    if (!deps.splice) {
+      factory = deps;
+      deps = [];
+    }
+    if (!_defined[name] && !_waiting[name]) {
+      return _waiting[name] = [name, deps, factory];
+    }
+  };
+
+  window.define.amd = {};
+
+}).call(this);
+
+(function() {
+  var baseUrl, config, _defined, _defining, _each, _load_module, _loaded, _loading, _map, _normalize, _on_defined, _parallel, _ref, _require, _waiting,
+    __slice = [].slice;
+
+  config = {};
+
+  baseUrl = (_ref = window.tinyamd_config) != null ? _ref : '';
+
+  if (baseUrl.charAt(baseUrl.length - 1) !== '/') {
+    baseUrl += '/';
+  }
+
+  _defined = {};
+
+  _waiting = {};
+
+  _defining = {};
+
+  _each = [].forEach != null ? function(a, c, b) {
+    return a.forEach(c, b);
+  } : function(a, c, b) {
+    _map(a, c, b);
+    return null;
+  };
+
+  _map = [].map != null ? function(a, c, b) {
+    return a.map(c, b);
+  } : function(a, c, b) {
+    var i, results, x, _i, _len;
+
+    results = [];
+    for (i = _i = 0, _len = a.length; _i < _len; i = ++_i) {
+      x = a[i];
+      results.push(c.call(b || this, x, i));
+    }
+    return results;
+  };
+
+  _parallel = function(tasks, callback) {
+    var results, succeeded;
+
+    succeeded = 0;
+    results = [];
+    if (tasks.length === 0) {
+      return callback(void 0, results);
+    }
+    return _each(tasks, function(task, i) {
+      return task.call(this, function(err, result) {
+        if (err != null) {
+          succeeded = -1;
+          return callback(err);
+        }
+        results[i] = result;
+        if ((succeeded += 1) === tasks.length) {
+          return callback(void 0, results);
+        }
+      });
+    });
+  };
+
+  _normalize = function(name, base) {
+    var i, p, parts;
+
+    parts = name.split('/');
+    if (parts[0].indexOf('.') === 0) {
+      if (base != null) {
+        parts = (p = base.split('/')).slice(0, p.length - 1).concat(parts);
+      }
+      name = [];
+      i = parts.length - 1;
+      while (i >= 0) {
+        if (parts[i] === '..') {
+          i -= 1;
+        } else {
+          if (parts[i] !== '.') {
+            name.unshift(parts[i]);
+          }
+        }
+        i -= 1;
+      }
+      name = name.join('/');
+    }
+    return name;
+  };
+
+  _loading = {};
+
+  _loaded = {};
+
+  _on_defined = {};
+
+  _load_module = function(nid, callback) {
+    if (_loading[nid]) {
+      _on_defined[nid].push(callback);
+    } else {
+      _loading[nid] = true;
+      _on_defined[nid] = [callback];
+      return head.js("" + baseUrl + nid + ".js", function() {
+        _loaded[nid] = true;
+        return window.setTimeout((function() {
+          return _require([nid], function(module) {
+            return _each(_on_defined[nid], function(callback) {
+              return callback(module);
+            });
+          });
+        }), 10);
+      });
+    }
+  };
+
+  _require = function(__id_or_ids, callback) {
+    var args, id, ids, module_dep_names, module_factory, module_factory_args, module_name, tasks;
+
+    if (callback != null) {
+      ids = __id_or_ids;
+      tasks = _map(ids, function(id) {
+        return function(task_callback) {
+          var args, module_dep_nids, module_factory, module_name;
+
+          if (_defined[id]) {
+            return task_callback(void 0, _defined[id]);
+          } else if ((args = _waiting[id])) {
+            delete _waiting[id];
+            module_name = args[0];
+            module_dep_nids = _map(args[1] || [], function(did) {
+              return _normalize(did, id);
+            });
+            module_factory = args[2];
+            return _require(module_dep_nids, function() {
+              var module_dependencies;
+
+              module_dependencies = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+              _defined[id] = module_factory.apply(this, module_dependencies);
+              return task_callback(void 0, _defined[id]);
+            });
+          } else {
+            if (_loaded[id]) {
+              return task_callback("unable to load module " + id + " remotely");
+            } else {
+              return _load_module(id, function(module) {
+                return task_callback(void 0, module);
+              });
+            }
+          }
+        };
+      });
+      return _parallel(tasks, function(err, modules) {
+        if (err != null) {
+          throw new Error(err);
+        }
+        return callback.apply(this, modules);
+      });
+    } else {
+      id = __id_or_ids;
+      if (id === 'require') {
+        return _require;
+      }
+      if (!_defined[id] && (args = _waiting[id])) {
+        delete _waiting[id];
+        module_name = args[0];
+        module_dep_names = args[1] || [];
+        module_factory = args[2];
+        module_factory_args = _map(module_dep_names, function(dep_name) {
+          return _require(_normalize(dep_name, module_name));
+        });
+        _defined[id] = module_factory.apply(this, module_factory_args);
+      }
+      return _defined[id];
+    }
+  };
+
+  window.require = function(id_or_ids, callback) {
+    if (typeof id_or_ids === 'string') {
+      return _require(id_or_ids) || (function() {
+        throw new Error("missing module " + id_or_ids);
+      })();
+    } else if (id_or_ids.splice) {
+      if (typeof callback !== 'function') {
+        throw new Error("missing callback");
+      }
+      _require(id_or_ids, callback);
+      return require;
+    }
+  };
+
+  window.define = function(name, deps, factory) {
+    if (!deps.splice) {
+      factory = deps;
+      deps = [];
+    }
+    if (!_defined[name] && !_waiting[name]) {
+      return _waiting[name] = [name, deps, factory];
+    }
+  };
+
+  window.define.amd = {};
+
+}).call(this);

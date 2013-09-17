@@ -23,7 +23,7 @@ _each = if [].forEach? then (a, c, b) -> a.forEach(c, b) else (a, c, b) ->
 
 
 # Maps over an array. Uses native Array.map if available
-_map = if ![].map? then (a, c, b) -> a.map(c, b) else (a, c, b) ->
+_map = if [].map? then (a, c, b) -> a.map(c, b) else (a, c, b) ->
   results = []
   results.push c.call (b || @), x, i for x, i in a
   results
@@ -55,22 +55,25 @@ _parallel = (tasks, callback) ->
 _normalize = (name, base) ->  
   # split base on '/', drop the last element, and concat with split name
   # e.g.  `./name`, `/the/base`  -> `/the/./name`
-  if base
-    parts = (p=base.split('/')).slice(0, p.length-1).concat(name.split('/'))
+  parts = name.split('/')
+  if parts[0].indexOf('.') == 0
+    # the name is relative
+    if base?
+      parts = (p=base.split('/')).slice(0, p.length-1).concat(parts)
     # remove dots : loop over parts in reverse order, skipping single dots and
     # 'jumping' double dots
     name = []
-    for i in [parts.length-1..0] by -1
-      # skip '..' part unless it's the first one
-      if parts[i] == '..' && i > 0
+    i = parts.length - 1
+    while i >= 0
+      # skip '..' part
+      if parts[i] == '..'
         i -= 1
-        break
-      # prepend parts[i] at the beginning of name array, ignoring '.'
-      name.unshift parts[i] unless parts[i] == '.'
+      else
+        # prepend parts[i] at the beginning of name array, ignoring '.'
+        name.unshift parts[i] unless parts[i] == '.'
+      i -= 1
     # done removing dots
     name = name.join('/')
-  else if name.indexOf('./') == 0
-    name = name.substring(2)
   name
 
 
@@ -128,13 +131,14 @@ _require = (__id_or_ids, callback) ->
   else
     # we are loading a single module synchronously
     id = __id_or_ids
+    return _require if id == 'require'
     if !_defined[id] && (args = _waiting[id])
       delete _waiting[id]
       module_name = args[0]
       module_dep_names = args[1] || []
       module_factory = args[2]
       module_factory_args = _map module_dep_names, (dep_name) ->
-        _require _normalize(dep_name)
+        _require _normalize(dep_name, module_name)
       _defined[id] = module_factory.apply @, module_factory_args
     return _defined[id]
 
@@ -189,4 +193,7 @@ window.define = (name, deps, factory) ->
     _waiting[name] = [name, deps, factory]
 
 
+# make it clear that this `define` function conforms to the AMD spec
+# https://github.com/amdjs/amdjs-api/wiki/AMD#defineamd-property-
+window.define.amd = {}
   

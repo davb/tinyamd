@@ -37,7 +37,7 @@ module.exports = function(grunt) {
       tasks: ['clean:dist', 'coffee', 'concat']
     },
     clean: {
-      dist: ['<%= filename %>.*.js'],
+      dist: ['<%= pkg.name %>-*.js'],
       tmp: ['./tmp']
     }
   });
