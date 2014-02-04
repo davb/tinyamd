@@ -1,199 +1,114 @@
-# Configuration
-config = {}
-# Base URL for file paths
-baseUrl = window.tinyamd_config ? ''
-# Ensure Base URL ends with a '/'
-baseUrl += '/' unless baseUrl.charAt(baseUrl.length - 1 ) == '/'
+((exports) ->
 
 
-# All defined modules by their normalized name
-_defined = {}
-
-# Modules waiting to be loaded
-_waiting = {}
-
-# Modules being defined
-_defining = {}
+  _validate_define_arguments = (args) ->
+    pass = (args.length >= 2) && (args.length < 4) &&
+      (typeof args[0] is 'string')
+    throw new Error "invalid arguments for define", args if !pass
 
 
-# Iterates over an array. Uses native Array.forEach if available
-_each = if [].forEach? then (a, c, b) -> a.forEach(c, b) else (a, c, b) ->
-  _map a, c, b
-  null
+  _validate_require_arguments = (args) ->
+    pass = (args.length == 1) &&
+      (typeof args[0] is 'string')
+    throw new Error "invalid arguments for require", args if !pass
 
 
-# Maps over an array. Uses native Array.map if available
-_map = if [].map? then (a, c, b) -> a.map(c, b) else (a, c, b) ->
-  results = []
-  results.push c.call (b || @), x, i for x, i in a
-  results
+  # modules defined by the `define` function are stored here
+  # as [path, deps, factory]
+  # where
+  #   - path is the absolute path of the module
+  #   - deps is an array of relative or absolute paths of the dependencies
+  #   - factory is the factory function that returns the module
+  _definitions = {}
 
 
-# Run an array of functions in parallel.
-# If any of the functions pass an error to its callback, the main callback
-# is immediately called with the value of the error as its first argument.
-# Once all tasks have completed, the results are passed to the final callback
-# as an array as its second argument.
-_parallel = (tasks, callback) ->
-  succeeded = 0
-  results = []
-  # if there are no task, consider it a success and immediately call callback
-  return callback(undefined, results) if tasks.length == 0
-  # otherwise, run all tasks in parallel, storing their results in order
-  _each tasks, (task, i) ->
-    task.call @, (err, result) ->
-      if err?
-        # an error occurred: immediately call the main callback
-        succeeded = - 1 # the success callback will never get called
-        return callback(err)
-      # the task completed successfully
-      results[i] = result
-      callback(undefined, results) if (succeeded += 1) == tasks.length
+  # defines a module
+  # accepts the following arguments
+  #     path, deps, factory
+  # or  path, factory
+  # where
+  #   - path is a string
+  #   - deps is an array
+  #   - factory is a function
+  def = (path, deps, factory) ->
+    _validate_define_arguments arguments
+    if arguments.length == 2
+      factory = deps
+      deps = []
+    _definitions[_root path] = [deps, factory]
 
 
-# Normalize file path
-_normalize = (name, base) ->  
-  # split base on '/', drop the last element, and concat with split name
-  # e.g.  `./name`, `/the/base`  -> `/the/./name`
-  parts = name.split('/')
-  if parts[0].indexOf('.') == 0
-    # the name is relative
-    if base?
-      parts = (p=base.split('/')).slice(0, p.length-1).concat(parts)
-    # remove dots : loop over parts in reverse order, skipping single dots and
-    # 'jumping' double dots
-    name = []
-    i = parts.length - 1
-    while i >= 0
-      # skip '..' part
-      if parts[i] == '..'
-        i -= 1
-      else
-        # prepend parts[i] at the beginning of name array, ignoring '.'
-        name.unshift parts[i] unless parts[i] == '.'
-      i -= 1
-    # done removing dots
-    name = name.join('/')
-  name
+  # make it clear that def is an AMD `define` function
+  def.amd = {}
 
 
-_loading = {}
-_loaded = {}
-_on_defined = {}
-# id is expected to be normalized
-_load_module = (nid, callback) ->
-  if _loading[nid]
-    _on_defined[nid].push(callback)
-    return
-  else
-    _loading[nid] = true
-    _on_defined[nid] = [callback]
-    head.js "#{baseUrl}#{nid}.js", ->
-      _loaded[nid] = true
-      window.setTimeout (->
-        _require [nid], (module) ->
-          _each _on_defined[nid], (callback) ->
-            callback(module)
-      ), 10
+  # 'roots' an absolute path, i.e. ensures it begins with '/'
+  _root = (path) ->
+    if path[0] == '/' then path else '/' + path
 
 
-# we assume the id's passed to this function are normalized
-_require = (__id_or_ids, callback) ->
-  if callback?
-    # we are loading several modules asynchronously
-    ids = __id_or_ids
-    tasks = _map ids, (id) ->
-      (task_callback) ->
-        if _defined[id]
-          # module is defined: return it
-          return task_callback(undefined, _defined[id])
-        else if (args = _waiting[id])
-          # module is waiting: call its factory function
-          delete _waiting[id]
-          module_name = args[0]
-          module_dep_nids = _map (args[1] || []), (did) -> _normalize(did, id)
-          module_factory = args[2]
-          _require module_dep_nids, (module_dependencies...) ->
-            _defined[id] = module_factory.apply @, module_dependencies
-            task_callback(undefined, _defined[id])
-        else
-          # module is not available: load it remotely, or fail if loading has
-          # already been attempted
-          if _loaded[id]
-            task_callback("unable to load module #{id} remotely")
-          else
-            _load_module id, (module) ->
-              task_callback(undefined, module)
-    # run tasks in parallel and retrieve modules
-    _parallel tasks, (err, modules) ->
-      throw new Error(err) if err?
-      callback.apply @, modules
-  else
-    # we are loading a single module synchronously
-    id = __id_or_ids
-    return _require if id == 'require'
-    if !_defined[id] && (args = _waiting[id])
-      delete _waiting[id]
-      module_name = args[0]
-      module_dep_names = args[1] || []
-      module_factory = args[2]
-      module_factory_args = _map module_dep_names, (dep_name) ->
-        _require _normalize(dep_name, module_name)
-      _defined[id] = module_factory.apply @, module_factory_args
-    return _defined[id]
+  # turns a relative path into an absolute path, starting from the base
+  _path_to_absolute = (path, base) ->
+    unless path[0] == '.'
+      return _root path
+    # ensure the root starts with '/'
+    base = _root base
+    base = base.split('/')
+    path = path.split('/')
+    b = base.length
+    p = 0
+    while (e = path[p])[0] is '.'
+      b -= 2 if e == '..'
+      b -= 1 if e == '.'
+      p += 1
+    base.slice(0, b).concat(path.slice(p)).join('/')
+
+    
+  # caches the modules which have already been factoried
+  _modules = {}
+
+  # keeps track of the modules that are being resolved
+  _resolving = {}
 
 
-# AMD `require` function
-#
-# - require(String)
-# Synchronously returns the module export for the module ID represented by
-# the String argument.
-# Throws an error if the module has not been already loaded and evaluated.
-# It does NOT try to dynamically fetch the module if not already loaded.
-#
-# - require(Array, Function)
-# The Array is an array of String module IDs. Retrieves the modules represented
-# by the module IDs and once all the modules for those module IDs are available,
-# the Function callback is called, passing the modules in the same order as
-# their IDs in the Array argument.
-#
-window.require = (id_or_ids, callback) ->
-  if typeof id_or_ids == 'string'
-    # we are synchronously loading a single module
-    # ignore callback, use return value
-    return _require(id_or_ids) || throw new Error("missing module #{id_or_ids}")
-  else if id_or_ids.splice
-    # we are asynchronously several modules: required callback
-    throw new Error("missing callback") unless typeof callback == 'function'
-    # return self, pass callback
-    _require id_or_ids, callback
-    return require
+  # private `require` function, accepts an absolute path
+  _req = (absolute_path) ->
+    # return the cached module if we have it
+    if (m = _modules[absolute_path])
+      return _modules[absolute_path]
+    # if the module is already being resolved, we have a loop
+    if _resolving[absolute_path]
+      throw new Error "circular dependency detected"
+    # if the module is undefined, throw an error
+    if !(definition = _definitions[absolute_path])
+      throw new Error "missing module #{absolute_path.substr(1)}"
+    # otherwise we need to resolve the dependencies
+    _resolving[absolute_path] = 1
+    resolved_deps = []
+    for d in definition[0]
+      resolved_deps.push _req_rel(d, absolute_path)
+    _modules[absolute_path] = module = definition[1].apply @, resolved_deps
+    delete _resolving[absolute_path]
+    module
 
 
-# AMD `define` function
-#
-# - define(String id, Function factory)
-# Defines a named module with no dependencies
-#
-# - define(String id, Array dependencies, Function factory)
-# Defines a named module with an array of dependencies. The factory function
-# will receive the dependent modules as arguments in the order they are
-# specified
-#
-# Other definitions, even accepted by the AMD standard, are not supported here.
-#
-window.define = (name, deps, factory) ->
-  # this module may not have dependencies
-  if !deps.splice
-    # deps is not an array; it should be the callback function then
-    factory = deps
-    deps = []
-  # if module not already defined or waiting, add to waiting
-  if !_defined[name] && !_waiting[name]
-    _waiting[name] = [name, deps, factory]
-
-
-# make it clear that this `define` function conforms to the AMD spec
-# https://github.com/amdjs/amdjs-api/wiki/AMD#defineamd-property-
-window.define.amd = {}
+  # private `require` function, accepts an absolute or relative path
+  _req_rel = (path, root) ->
+    # if the path is `require`, return a relative 'require' function
+    if path == 'require'
+      return (p) -> _req_rel(p, root)
+    _req _path_to_absolute(path, root)
   
+
+  # public `require` function, accepts an absolute path
+  req = (path) ->
+    _validate_require_arguments arguments
+    _req _root(path)
+
+
+  # export the define and require functions
+  exports.define = def
+  exports.require = req
+  {define: def, require: req}
+
+)(typeof exports is 'undefined' && @ || exports)

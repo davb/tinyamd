@@ -6,35 +6,26 @@ module.exports = function(grunt) {
     coffee: {
       compile: {
         options: {
-          bare: false
+          bare: true
         },
         files: {
-          '.tmp/<%= filename %>.js': 'src/<%= pkg.name %>.coffee'
+          '<%= filename %>.js': 'src/<%= pkg.name %>.coffee'
         }
-      }
-    },
-    concat: {
-      options: {
-        separator: "\n"
-      },
-      dist: {
-        src: ['components/headjs/src/load.js', '.tmp/*.js'],
-        dest: '<%= filename %>.js'
       }
     },
     uglify: {
       options: {
-        banner: '/*! <%= pkg.name %> <%= pkg.version %> <%= grunt.template.today("dd-mm-yyyy") %> */\n'
+        banner: '/*! <%= pkg.name %> <%= pkg.version %> <%= grunt.template.today("dd-mm-yyyy") %> */'
       },
       dist: {
         files: {
-          '<%= filename %>.min.js': ['<%= concat.dist.dest %>']
+          '<%= filename %>.min.js': ['<%= filename %>.js']
         }
       }
     },
     watch: {
       files: ['./*.coffee'],
-      tasks: ['clean:dist', 'coffee', 'concat']
+      tasks: ['clean:dist', 'coffee']
     },
     clean: {
       dist: ['<%= pkg.name %>-*.js'],
@@ -51,6 +42,6 @@ module.exports = function(grunt) {
 
   //grunt.registerTask('test', ['jshint', 'qunit']);
 
-  grunt.registerTask('default', ['clean:tmp', 'clean:dist', 'coffee', 'concat', 'uglify', 'clean:tmp']);
+  grunt.registerTask('default', ['clean:tmp', 'clean:dist', 'coffee', 'uglify', 'clean:tmp']);
 
 };
