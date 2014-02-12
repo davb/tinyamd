@@ -13,6 +13,10 @@
     throw new Error "invalid arguments for require", args if !pass
 
 
+  # helper function to get the first character of a string
+  _first_char = (s) -> s.charAt 0
+
+
   # modules defined by the `define` function are stored here
   # as [path, deps, factory]
   # where
@@ -44,12 +48,12 @@
 
   # 'roots' an absolute path, i.e. ensures it begins with '/'
   _root = (path) ->
-    if path[0] == '/' then path else '/' + path
+    if _first_char(path) == '/' then path else '/' + path
 
 
   # turns a relative path into an absolute path, starting from the base
   _path_to_absolute = (path, base) ->
-    unless path[0] == '.'
+    unless _first_char(path) == '.'
       return _root path
     # ensure the root starts with '/'
     base = _root base
@@ -57,7 +61,7 @@
     path = path.split('/')
     b = base.length
     p = 0
-    while (e = path[p])[0] is '.'
+    while _first_char(e = path[p]) == '.'
       b -= 2 if e == '..'
       b -= 1 if e == '.'
       p += 1

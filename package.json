@@ -1,6 +1,6 @@
 {
   "name": "tinyamd",
-  "version": "0.1.3a",
+  "version": "0.1.3b",
   "devDependencies": {
     "grunt": "~0.4.1",
     "grunt-contrib-coffee": "0.7",

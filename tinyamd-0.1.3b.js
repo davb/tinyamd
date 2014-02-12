@@ -1,5 +1,5 @@
 (function(exports) {
-  var def, req, _definitions, _modules, _path_to_absolute, _req, _req_rel, _resolving, _root, _validate_define_arguments, _validate_require_arguments;
+  var def, req, _definitions, _first_char, _modules, _path_to_absolute, _req, _req_rel, _resolving, _root, _validate_define_arguments, _validate_require_arguments;
 
   _validate_define_arguments = function(args) {
     var pass;
@@ -17,6 +17,9 @@
       throw new Error("invalid arguments for require", args);
     }
   };
+  _first_char = function(s) {
+    return s.charAt(0);
+  };
   _definitions = {};
   def = function(path, deps, factory) {
     _validate_define_arguments(arguments);
@@ -28,7 +31,7 @@
   };
   def.amd = {};
   _root = function(path) {
-    if (path[0] === '/') {
+    if (_first_char(path) === '/') {
       return path;
     } else {
       return '/' + path;
@@ -37,7 +40,7 @@
   _path_to_absolute = function(path, base) {
     var b, e, p;
 
-    if (path[0] !== '.') {
+    if (_first_char(path) !== '.') {
       return _root(path);
     }
     base = _root(base);
@@ -45,7 +48,7 @@
     path = path.split('/');
     b = base.length;
     p = 0;
-    while ((e = path[p])[0] === '.') {
+    while (_first_char(e = path[p]) === '.') {
       if (e === '..') {
         b -= 2;
       }
